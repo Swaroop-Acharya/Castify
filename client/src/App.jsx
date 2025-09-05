@@ -9,12 +9,12 @@ function App() {
   const [videoOn, setVideoOn] = useState(true);
   const [micOn, setMicOn] = useState(true);
   const [live, setLive] = useState(false);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const init = async () => {
-
-      if(initOnceRef.current)return;
-      initOnceRef.current=true;
+      if (initOnceRef.current) return;
+      initOnceRef.current = true;
 
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -26,6 +26,8 @@ function App() {
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
+
+        setRead(true);
       } catch (err) {
         console.error("Error accessing media devices:", err);
       }
@@ -41,19 +43,19 @@ function App() {
   }, []);
 
   const toggleVideo = () => {
-    if (streamRef.current) {
-      const videoTrack = streamRef.current.getVideoTracks()[0];
-      if (videoTrack) videoTrack.enabled = !videoOn;
-    }
-    setVideoOn((prev) => !prev);
+    if (!ready || !streamRef.current) return;
+
+    const next = !videoOn;
+    streamRef.current.getVideoTracks().forEach((t) => (t.enabled = next));
+    setVideoOn(next);
   };
 
   const toggleMic = () => {
-    if (streamRef.current) {
-      const audioTrack = streamRef.current.getAudioTracks()[0];
-      if (audioTrack) audioTrack.enabled = !micOn;
-    }
-    setMicOn((prev) => !prev);
+    if (!ready || !streamRef.current) return;
+
+    const next = !micOn;
+    streamRef.current.getVideoTracks().forEach((t) => (t.enabled = next));
+    setVideoOn(next);
   };
 
   return (
@@ -83,6 +85,7 @@ function App() {
           variant={videoOn ? "default" : "destructive"}
           onClick={toggleVideo}
           size="icon"
+          disabled={!ready}
         >
           {videoOn ? (
             <Video className="h-6 w-6" />
@@ -96,6 +99,7 @@ function App() {
           onClick={toggleMic}
           size="icon"
           variant={micOn ? "default" : "destructive"}
+          disabled={!ready}
         >
           {micOn ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
         </Button>
