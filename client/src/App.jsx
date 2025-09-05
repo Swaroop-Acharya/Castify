@@ -27,7 +27,7 @@ function App() {
           videoRef.current.srcObject = stream;
         }
 
-        setRead(true);
+        setReady(true);
       } catch (err) {
         console.error("Error accessing media devices:", err);
       }
@@ -55,7 +55,7 @@ function App() {
 
     const next = !micOn;
     streamRef.current.getVideoTracks().forEach((t) => (t.enabled = next));
-    setVideoOn(next);
+    setMicOn(next);
   };
 
   return (
@@ -96,9 +96,9 @@ function App() {
 
         {/* Mic Button */}
         <Button
+          variant={micOn ? "default" : "destructive"}
           onClick={toggleMic}
           size="icon"
-          variant={micOn ? "default" : "destructive"}
           disabled={!ready}
         >
           {micOn ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
