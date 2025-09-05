@@ -5,12 +5,17 @@ import { Video, VideoOff, Mic, MicOff, Radio } from "lucide-react";
 function App() {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
+  const initOnceRef = useRef(false);
   const [videoOn, setVideoOn] = useState(true);
   const [micOn, setMicOn] = useState(true);
   const [live, setLive] = useState(false);
 
   useEffect(() => {
     const init = async () => {
+
+      if(initOnceRef.current)return;
+      initOnceRef.current=true;
+
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: true,
