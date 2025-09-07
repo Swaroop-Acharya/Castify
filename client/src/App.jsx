@@ -6,9 +6,11 @@ function App() {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const initOnceRef = useRef(false);
+  const recorderRef = useRef(null);
   const [videoOn, setVideoOn] = useState(true);
   const [micOn, setMicOn] = useState(true);
-  const [live, setLive] = useState(false);
+  const [isLive, setIsLive] = useState(false);
+  const [isPreparingStream, setIsPreparingStream] = useState(false);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -39,12 +41,12 @@ function App() {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
       }
+      clearTimeout();
     };
   }, []);
 
   const toggleVideo = () => {
     if (!ready || !streamRef.current) return;
-
     const next = !videoOn;
     streamRef.current.getVideoTracks().forEach((t) => (t.enabled = next));
     setVideoOn(next);
@@ -52,15 +54,43 @@ function App() {
 
   const toggleMic = () => {
     if (!ready || !streamRef.current) return;
-
     const next = !micOn;
     streamRef.current.getVideoTracks().forEach((t) => (t.enabled = next));
     setMicOn(next);
   };
 
+  const handleOnDataAvailable = (e) => {
+    console.log("data-available");
+    if (e.data.size > 0) console.log("data:", e.data);
+  };
+
+  const handleGoLive = () => {
+    console.log("Hi");
+    if (!streamRef.current) return;
+
+    setIsPreparingStream(true);
+    const options = {
+      mimeType: "video/webm; codecs=vp9",
+    };
+    const mediaRecorder = new MediaRecorder(streamRef.current, options);
+    recorderRef.current = mediaRecorder;
+    mediaRecorder.ondataavailable = handleOnDataAvailable;
+    mediaRecorder.start();
+
+    setTimeout(() => {
+      setIsPreparingStream(false);
+      setReady(true);
+      setIsLive(true);
+    }, 2000);
+  };
+
+  const handleEndStream = () => {
+    setIsLive(false);
+    console.log("Stream ended");
+  };
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-neutral-900 text-white relative">
-      {/* Video Preview */}
       <div className="relative w-full max-w-3xl aspect-video bg-black rounded-2xl shadow-xl overflow-hidden">
         <video
           ref={videoRef}
@@ -69,18 +99,20 @@ function App() {
           playsInline
           muted
         />
-        {/* LIVE Badge */}
-        {live && (
-          <div className="absolute top-4 right-4 flex items-center space-x-2 bg-red-600 px-3 py-1 rounded-full shadow-lg animate-pulse">
-            <span className="w-2 h-2 bg-white rounded-full"></span>
-            <span className="text-white text-sm font-semibold">LIVE</span>
+        {isLive && (
+          <div className="absolute top-4 right-4 flex items-center space-x-2 bg-red-500 text-white px-3 py-1 rounded-full text-sm">
+            <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+            <span>LIVE</span>
+          </div>
+        )}
+        {isPreparingStream && (
+          <div className="absolute top-4 right-4 flex items-center space-x-2 bg-orange-500 text-white px-3 py-1 rounded-full text-sm">
+            <div className="w-2 h-2 bg-white rounded-full animate-spin"></div>
+            <span>PREPARING...</span>
           </div>
         )}
       </div>
-
-      {/* Control Bar */}
       <div className="absolute bottom-10 flex items-center space-x-6 bg-white px-6 py-3 rounded shadow-lg">
-        {/* Video Button */}
         <Button
           variant={videoOn ? "default" : "destructive"}
           onClick={toggleVideo}
@@ -94,7 +126,6 @@ function App() {
           )}
         </Button>
 
-        {/* Mic Button */}
         <Button
           variant={micOn ? "default" : "destructive"}
           onClick={toggleMic}
@@ -104,14 +135,26 @@ function App() {
           {micOn ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
         </Button>
 
-        {/* Go Live */}
         <Button
+          variant={isLive ? "destructive" : "default"}
           size="lg"
-          onClick={() => setLive(!live)}
-          className="bg-blue-600 hover:bg-blue-700 text-white rounded-full px-6 py-3 flex items-center space-x-2"
+          onClick={isLive ? handleEndStream : handleGoLive}
+          disabled={isPreparingStream || (!videoOn && !micOn)}
+          className="min-w-[120px] cursor-pointer"
         >
-          <Radio className="h-5 w-5 animate-pulse" />
-          <span>Go Live</span>
+          {isPreparingStream ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+              Preparing...
+            </>
+          ) : isLive ? (
+            "End Stream"
+          ) : (
+            <>
+              <Radio className="h-5 w-5 animate-pulse" />
+              Go Live
+            </>
+          )}
         </Button>
       </div>
     </div>
