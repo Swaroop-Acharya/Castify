@@ -64,10 +64,11 @@ function App() {
     setMicOn(next);
   };
 
-  const handleOnDataAvailable = (e) => {
-    console.log("data-available");
+  const handleOnDataAvailable = async (e) => {
+    console.log("Streaming data");
     if (e.data && e.data.size > 0) {
-      socket.emit("binarystream", e.data);
+      const arrayBuffer = await e.data.arrayBuffer();
+      socket.emit("binarystream", new Uint8Array(arrayBuffer));
     }
   };
 
