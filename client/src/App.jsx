@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Video, VideoOff, Mic, MicOff, Radio } from "lucide-react";
+import { io } from "socket.io-client";
+
+const LOCALHOST_SOCKET_URL = import.meta.env.VITE_LOCAL_SOCKET_URL;
+const PROD_SOCKET_URL = "";
+const socket = io(import.meta.env.DEV ? LOCALHOST_SOCKET_URL : PROD_SOCKET_URL);
 
 function App() {
   const videoRef = useRef(null);
@@ -55,38 +60,67 @@ function App() {
   const toggleMic = () => {
     if (!ready || !streamRef.current) return;
     const next = !micOn;
-    streamRef.current.getVideoTracks().forEach((t) => (t.enabled = next));
+    streamRef.current.getAudioTracks().forEach((t) => (t.enabled = next));
     setMicOn(next);
   };
 
   const handleOnDataAvailable = (e) => {
     console.log("data-available");
-    if (e.data.size > 0) console.log("data:", e.data);
+    if (e.data && e.data.size > 0) {
+      socket.emit("binarystream", e.data);
+    }
   };
 
   const handleGoLive = () => {
-    console.log("Hi");
-    if (!streamRef.current) return;
-
+    if (!streamRef.current || typeof MediaRecorder === "undefined") {
+      console.log("MediaRecorder not supported or stream missing");
+      return;
+    }
     setIsPreparingStream(true);
-    const options = {
-      mimeType: "video/webm; codecs=vp9",
-    };
-    const mediaRecorder = new MediaRecorder(streamRef.current, options);
+    const candidates = [
+      "video/webm;codecs=vp8",
+      "video/webm;codecs=vp9",
+      "video/webm",
+    ];
+
+    const mimeType =
+      (MediaRecorder.isTypeSupported &&
+        candidates.find((t) => MediaRecorder.isTypeSupported(t))) ||
+      "";
+
+    let mediaRecorder;
+
+    try {
+      mediaRecorder = new MediaRecorder(
+        streamRef.current,
+        mimeType ? { mimeType } : undefined,
+      );
+    } catch (e) {
+      console.error("MediaRecorder init failed", e);
+      setIsPreparingStream(false);
+      return;
+    }
+
     recorderRef.current = mediaRecorder;
     mediaRecorder.ondataavailable = handleOnDataAvailable;
-    mediaRecorder.start();
-
-    setTimeout(() => {
+    mediaRecorder.onerror = (e) => console.error("MediaRecorder error:", e);
+    mediaRecorder.onstart = () => {
       setIsPreparingStream(false);
-      setReady(true);
       setIsLive(true);
-    }, 2000);
+    };
+    mediaRecorder.start(1000);
   };
 
   const handleEndStream = () => {
+    const r = recorderRef.current;
+    if (r && r.state !== "inactive") {
+      try {
+        r.stop();
+      } catch (e) {
+        console.error("Recorder stop failed:", e);
+      }
+    }
     setIsLive(false);
-    console.log("Stream ended");
   };
 
   return (
