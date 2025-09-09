@@ -11,13 +11,15 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "engines":{
+    "node":">=18"
+  },
   "dependencies": {
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
-    "http": "^0.0.1-security",
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
-    "nodemon": "^1.4.1"
+    "nodemon": "^3"
   }
 }

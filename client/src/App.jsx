@@ -3,9 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Video, VideoOff, Mic, MicOff, Radio } from "lucide-react";
 import { io } from "socket.io-client";
 
-const LOCALHOST_SOCKET_URL = import.meta.env.VITE_LOCAL_SOCKET_URL;
-const PROD_SOCKET_URL = "";
-const socket = io(import.meta.env.DEV ? LOCALHOST_SOCKET_URL : PROD_SOCKET_URL);
+const socket = io("http://localhost:3000");
 
 function App() {
   const videoRef = useRef(null);
@@ -46,7 +44,6 @@ function App() {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
       }
-      clearTimeout();
     };
   }, []);
 
@@ -66,6 +63,7 @@ function App() {
 
   const handleOnDataAvailable = async (e) => {
     console.log("Streaming data");
+    if (socket.disconnected) return;
     if (e.data && e.data.size > 0) {
       const arrayBuffer = await e.data.arrayBuffer();
       socket.emit("binarystream", new Uint8Array(arrayBuffer));
@@ -121,6 +119,7 @@ function App() {
         console.error("Recorder stop failed:", e);
       }
     }
+    recorderRef.current = null;
     setIsLive(false);
   };
 
@@ -174,7 +173,9 @@ function App() {
           variant={isLive ? "destructive" : "default"}
           size="lg"
           onClick={isLive ? handleEndStream : handleGoLive}
-          disabled={isPreparingStream || (!videoOn && !micOn)}
+          disabled={
+            !ready || isPreparingStream || (!isLive && !videoOn && !micOn)
+          }
           className="min-w-[120px] cursor-pointer"
         >
           {isPreparingStream ? (

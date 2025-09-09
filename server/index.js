@@ -7,73 +7,106 @@ dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
-const io = new SocketIO(server);
 
-const options = [
-  "-f",
-  "webm", // input format (WebM chunks from browser)
-  "-i",
-  "-", // read from stdin
-  "-c:v",
-  "libx264", // re-encode video for YouTube
-  "-preset",
-  "ultrafast",
-  "-tune",
-  "zerolatency",
-  "-r",
-  "25", // FPS
-  "-g",
-  "50", // GOP size (2x FPS)
-  "-keyint_min",
-  "25", // keyframe interval
-  "-crf",
-  "25",
-  "-pix_fmt",
-  "yuv420p", // pixel format required by YouTube
-  "-sc_threshold",
-  "0",
-  "-profile:v",
-  "main",
-  "-level",
-  "3.1",
-  "-c:a",
-  "aac", // re-encode audio
-  "-b:a",
-  "128k",
-  "-ar",
-  "44100", // audio sample rate YouTube expects
-  "-f",
-  "flv", // output format
-  "rtmp://a.rtmp.youtube.com/live2/{process.env.YT_STREAM_KEY}", 
-];
-const ffmpegProcess = spawn("ffmpeg", options);
+const { YT_STREAM_KEY, CLIENT_ORIGIN } = process.env;
+if (!YT_STREAM_KEY) {
+  console.error("Missing STREAM_KEY in environment.");
+  process.exit(1); // fail fast instead of running broken
+}
 
-ffmpegProcess.stdout.on("data", (data) => {
-  console.log(`ffmpeg stdout: ${data}`);
+// Add CORS middleware for Express
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", CLIENT_ORIGIN);
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.header("Access-Control-Allow-Credentials", "true");
+
+  if (req.method === "OPTIONS") {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
 });
 
-ffmpegProcess.stderr.on("data", (data) => {
-  console.error(`ffmpeg stderr: ${data}`);
-});
-
-ffmpegProcess.on("close", (code) => {
-  console.log(`ffmpeg process exited with code ${code}`);
+const io = new SocketIO(server, {
+  cors: {
+    origin: CLIENT_ORIGIN, // your frontend URL
+    methods: ["GET", "POST"],
+    credentials: true,
+  },
 });
 
 io.on("connection", (socket) => {
   console.log("Socket Connected", socket.id);
 
-  socket.on("binarystream", (stream) => {
-    console.log("Binary Stream Incommming...");
-    ffmpegProcess.stdin.write(Buffer.from(stream), (err) => {
-      console.log("Err", err);
-    });
+  const ffmpegOptions = [
+    "-f",
+    "webm",
+    "-i",
+    "-",
+    "-c:v",
+    "libx264",
+    "-preset",
+    "ultrafast",
+    "-tune",
+    "zerolatency",
+    "-r",
+    "25",
+    "-g",
+    "50",
+    "-keyint_min",
+    "25",
+    "-crf",
+    "25",
+    "-pix_fmt",
+    "yuv420p",
+    "-sc_threshold",
+    "0",
+    "-profile:v",
+    "main",
+    "-level",
+    "3.1",
+    "-c:a",
+    "aac",
+    "-b:a",
+    "128k",
+    "-ar",
+    "44100",
+    "-f",
+    "flv",
+    `rtmp://a.rtmp.youtube.com/live2/${YT_STREAM_KEY}`,
+  ];
+
+  const ffmpeg = spawn("ffmpeg", ffmpegOptions, {
+    stdio: ["pipe", "inherit", "inherit"],
+  });
+
+  ffmpeg.on("error", (err) => console.error("ffmpeg spawn error:", err));
+  ffmpeg.on("close", (code) => console.log(`ffmpeg exited: ${code}`));
+
+  socket.on("binarystream", (data) => {
+    const chunk = ArrayBuffer.isView(data)
+      ? Buffer.from(data.buffer, data.byteOffset, data.byteLength)
+      : data instanceof ArrayBuffer
+        ? Buffer.from(new Uint8Array(data))
+        : Buffer.isBuffer(data)
+          ? data
+          : Buffer.from(data);
+    const ok = ffmpeg.stdin.write(chunk);
+    if (!ok) {
+      socket.emit("pause");
+      ffmpeg.stdin.once("drain", () => socket.emit("resume"));
+    }
   });
 
   socket.on("disconnect", () => {
     console.log(`Socket ${socket.id} disconnected`);
-    ffmpegProcess.stdin.end(); // stop gracefully
+    ffmpeg.stdin.end();
   });
+});
+
+app.get("/", (req, res) => {
+  res.send("Ping pong");
 });
 
 server.listen(3000, () => console.log(`HTTP Server is runnning on PORT 3000`));
