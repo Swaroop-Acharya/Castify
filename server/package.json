@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon --legacy-watch index.js"
@@ -10,12 +11,15 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "engines":{
+    "node":">=18"
+  },
   "dependencies": {
+    "dotenv": "^16.4.7",
     "express": "^5.1.0",
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.10"
+    "nodemon": "^3"
   }
 }
