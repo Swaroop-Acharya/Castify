@@ -17,17 +17,19 @@ function Studio() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    socket.on("pause", () => {
+    const onPause = () => {
       if (recorderRef.current?.state === "recording") {
-        recorderRef.current.pause(); // stop generating chunks
+        recorderRef.current.pause();
       }
-    });
-
-    socket.on("resume", () => {
+    };
+    const onResume = () => {
       if (recorderRef.current?.state === "paused") {
-        recorderRef.current.resume(); // continue sending chunks
+        recorderRef.current.resume();
       }
-    });
+    };
+    socket.on("pause", onPause);
+    socket.on("resume", onResume);
+
     const init = async () => {
       if (initOnceRef.current) return;
       initOnceRef.current = true;
@@ -37,12 +39,10 @@ function Studio() {
           video: true,
           audio: true,
         });
-
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
-
         setReady(true);
       } catch (err) {
         console.error("Error accessing media devices:", err);
@@ -52,9 +52,9 @@ function Studio() {
     init();
 
     return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-      }
+      socket.off("pause", onPause);
+      socket.off("resume", onResume);
+      handleEndStream(); // ensure consistent cleanup on unmount
     };
   }, []);
 
@@ -117,6 +117,11 @@ function Studio() {
       setIsPreparingStream(false);
       setIsLive(true);
     };
+    mediaRecorder.onstop = () => {
+      socket.emit("endstream");
+      setIsLive(false);
+      recorderRef.current = null;
+    };
     mediaRecorder.start(1000);
   };
 
@@ -131,6 +136,9 @@ function Studio() {
     }
     socket.emit("endstream");
     recorderRef.current = null;
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+    }
     setIsLive(false);
   };
 
