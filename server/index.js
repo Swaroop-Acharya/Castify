@@ -99,6 +99,19 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("endstream", () => {
+    console.log(`Stream ended for socket ${socket.id}`);
+    if (ffmpeg && !ffmpeg.killed) {
+      try {
+        ffmpeg.stdin.end();   // tell ffmpeg no more input
+      } catch (e) {
+        console.error("Failed to end FFmpeg stdin:", e);
+      }
+      ffmpeg.kill("SIGINT"); // optional: forcefully stop process
+    }
+  });
+  
+
   socket.on("disconnect", () => {
     console.log(`Socket ${socket.id} disconnected`);
     ffmpeg.stdin.end();

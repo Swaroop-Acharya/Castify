@@ -17,6 +17,17 @@ function Studio() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    socket.on("pause", () => {
+      if (recorderRef.current?.state === "recording") {
+        recorderRef.current.pause(); // stop generating chunks
+      }
+    });
+
+    socket.on("resume", () => {
+      if (recorderRef.current?.state === "paused") {
+        recorderRef.current.resume(); // continue sending chunks
+      }
+    });
     const init = async () => {
       if (initOnceRef.current) return;
       initOnceRef.current = true;
@@ -91,7 +102,7 @@ function Studio() {
     try {
       mediaRecorder = new MediaRecorder(
         streamRef.current,
-        mimeType ? { mimeType } : undefined,
+        mimeType ? { mimeType } : undefined
       );
     } catch (e) {
       console.error("MediaRecorder init failed", e);
@@ -118,6 +129,7 @@ function Studio() {
         console.error("Recorder stop failed:", e);
       }
     }
+    socket.emit("endstream");
     recorderRef.current = null;
     setIsLive(false);
   };
@@ -197,5 +209,3 @@ function Studio() {
 }
 
 export default Studio;
-
-
